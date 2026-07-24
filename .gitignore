@@ -1,0 +1,32 @@
+# Swift / SPM
+.build/
+.swiftpm/
+
+# Android
+android-receiver/build/
+android-receiver/app/build/
+android-receiver/.gradle/
+android-receiver/local.properties
+android-receiver/.idea/
+*.iml
+
+# Signing — never commit keystores or their credentials
+*.jks
+*.keystore
+keystore.properties
+
+# Packaging artifacts
+*.dmg
+*.apk
+.dmg-staging/
+
+# Internal planning notes
+plans/
+
+# OS noise
+.DS_Store
+
+# Editor / tooling local state
+.vscode/
+android-receiver/.kotlin/
+release-artifacts/
