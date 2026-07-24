@@ -37,7 +37,16 @@ final class TCPServer {
         tcpOptions.noDelay = true
         let params = NWParameters(tls: nil, tcp: tcpOptions)
 
-        listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+        // Bind to loopback only. The tablet always connects through adb
+        // reverse (which lands on 127.0.0.1) — the protocol has no
+        // authentication, so exposing the port on the LAN would let anyone
+        // on the network view the stream and inject input.
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(
+            host: "127.0.0.1",
+            port: NWEndpoint.Port(rawValue: port)!
+        )
+
+        listener = try NWListener(using: params)
         listener?.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:

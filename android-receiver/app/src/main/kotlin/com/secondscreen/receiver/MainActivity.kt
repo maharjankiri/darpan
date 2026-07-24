@@ -24,6 +24,12 @@ class MainActivity : Activity(), SurfaceHolder.Callback, TCPClientListener {
     private var surfaceReady = false
     private var pendingResponse: HandshakeResponse? = null
 
+    // Dimensions sent in the last handshake — a mismatch in surfaceChanged
+    // means the device rotated, so we reconnect to renegotiate the display
+    private var lastHandshakeWidth = 0
+    private var lastHandshakeHeight = 0
+    private var quickReconnect = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -60,6 +66,14 @@ class MainActivity : Activity(), SurfaceHolder.Callback, TCPClientListener {
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         Log.i(TAG, "Surface changed: ${width}x${height}")
+        if (lastHandshakeWidth != 0 &&
+            (width != lastHandshakeWidth || height != lastHandshakeHeight)
+        ) {
+            Log.i(TAG, "Display size changed (rotation) — reconnecting")
+            updateStatus("Rotating...")
+            quickReconnect = true
+            tcpClient?.disconnect()
+        }
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -113,6 +127,8 @@ class MainActivity : Activity(), SurfaceHolder.Callback, TCPClientListener {
             dpi = metrics.densityDpi,
             refreshRate = 60
         )
+        lastHandshakeWidth = metrics.widthPixels
+        lastHandshakeHeight = metrics.heightPixels
 
         Log.i(TAG, "Sending handshake: ${request.width}x${request.height} @${request.refreshRate}Hz, DPI=${request.dpi}")
         tcpClient?.sendHandshake(request)
@@ -157,14 +173,19 @@ class MainActivity : Activity(), SurfaceHolder.Callback, TCPClientListener {
         Log.i(TAG, "Disconnected from Mac host")
         decoder?.release()
         decoder = null
-        updateStatus("Disconnected. Reconnecting...")
+        lastHandshakeWidth = 0
+        lastHandshakeHeight = 0
 
-        // Auto-reconnect after delay
+        // Rotation restarts reconnect quickly; failures back off
+        val delay = if (quickReconnect) 200L else 2000L
+        quickReconnect = false
+        if (delay == 2000L) updateStatus("Disconnected. Reconnecting...")
+
         surfaceView.postDelayed({
             if (surfaceReady) {
                 startConnection()
             }
-        }, 2000)
+        }, delay)
     }
 
     override fun onDestroy() {
